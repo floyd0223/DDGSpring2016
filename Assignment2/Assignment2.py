@@ -42,7 +42,10 @@ def main():
         face at which we will compute the area.
         """
 
-        return 0.0 # placeholder value
+        halfEdge0 = self.anyHalfEdge
+        halfEdge1 = halfEdge0.next
+        vectorArea = cross(halfEdge0.vector, halfEdge1.vector)
+        return norm(vectorArea) / 2.0 # placeholder value
 
     @property
     @cacheGeometry
@@ -54,8 +57,10 @@ def main():
         face at which we will compute the normal.
         """
 
-        return Vector3D(0.0,0.0,0.0) # placeholder value
-
+        halfEdge0 = self.anyHalfEdge
+        halfEdge1 = halfEdge0.next
+        vectorArea = cross(halfEdge0.vector, halfEdge1.vector)
+        return normalized(vectorArea) # placeholder value
 
     @property
     @cacheGeometry
@@ -66,7 +71,10 @@ def main():
         vertex at which we will compute the normal.
         """
 
-        return Vector3D(0.0,0.0,0.0) # placeholder value
+        faceNormalSum = Vector3D(0.0,0.0,0.0)
+        for face in self.adjacentFaces():
+            faceNormalSum += face.normal
+        return normalized(faceNormalSum) # placeholder value
 
     @property
     @cacheGeometry
@@ -77,7 +85,10 @@ def main():
         vertex at which we will compute the normal.
         """
 
-        return Vector3D(0.0,0.0,0.0) # placeholder value
+        areaWeightNormalSum = Vector3D(0.0,0.0,0.0)
+        for face in self.adjacentFaces():
+            areaWeightNormalSum += face.normal * face.area
+        return normalized(areaWeightNormalSum) # placeholder value
 
     @property
     @cacheGeometry
@@ -88,8 +99,14 @@ def main():
         vertex at which we will compute the normal.
         """
 
-        return Vector3D(0.0,0.0,0.0) # placeholder value
-
+        halfEdgeList = list(self.adjacentHalfEdges())
+        angleWeightNormalSum = Vector3D(0.0, 0.0, 0.0)
+        for halfEdge in halfEdgeList:
+            a = halfEdge.vector
+            b = -halfEdge.next.next.vector
+            cosTheta = dot(a, b) / norm(a) / norm(b)
+            angleWeightNormalSum += acos(cosTheta) * halfEdge.face.normal
+        return  normalized(angleWeightNormalSum) # placeholder value
 
     @property
     @cacheGeometry
@@ -102,7 +119,9 @@ def main():
         halfedge at which we will compute the cotangent.
         """
 
-        return 0.0 # placeholder value
+        a = -self.next.vector
+        b = self.next.next.vector
+        return dot(a, b) / norm(cross(a, b)) # placeholder value
 
 
     @property
@@ -116,7 +135,12 @@ def main():
         vertex at which we will compute the normal.
         """
 
-        return Vector3D(0.0,0.0,0.0) # placeholder value
+        areaGradientSum = Vector3D(0.0, 0.0, 0.0)
+        for halfEdge0 in self.adjacentHalfEdges():
+            halfEdge1 = halfEdge0.twin
+            areaGradientSum -= halfEdge0.cotan * halfEdge0.vector
+            areaGradientSum += halfEdge1.cotan * halfEdge1.vector
+        return normalized(areaGradientSum) # placeholder value
 
     @property
     @cacheGeometry
@@ -127,9 +151,11 @@ def main():
         vertex at which we will compute the normal.
         """
 
-        return Vector3D(0.0,0.0,0.0) # placeholder value
-
-
+        halfEdgeList = list(self.adjacentHalfEdges())
+        sphereNormalSum = Vector3D(0.0, 0.0, 0.0)
+        for a, b in circlePairs(halfEdgeList):
+            sphereNormalSum += cross(b.vector, a.vector) / norm(a.vector) ** 2 / norm(b.vector) ** 2
+        return normalized(sphereNormalSum) # placeholder value
 
     @property
     @cacheGeometry
@@ -140,8 +166,12 @@ def main():
         vertex at which we will compute the angle defect.
         """
 
-        return 0.0 # placeholder value
-
+        angleDefect = 2 * pi
+        halfEdgeList = list(self.adjacentHalfEdges())
+        for a, b in circlePairs(halfEdgeList):
+            cosTheta = dot(a.vector, b.vector) / norm(a.vector) / norm(b.vector)
+            angleDefect -= acos(cosTheta)
+        return angleDefect # placeholder value
 
     def totalGaussianCurvature():
         """
@@ -150,7 +180,10 @@ def main():
         Note that you can access the mesh with the 'mesh' variable.
         """
 
-        return 0.0 # placeholder value
+        totalGaussianCurvature = 0.0
+        for vertex in mesh.verts:
+            totalGaussianCurvature += vertex.angleDefect
+        return totalGaussianCurvature # placeholder value
 
 
     def gaussianCurvatureFromGaussBonnet():
@@ -162,7 +195,10 @@ def main():
         sets of the vertices (resp. faces) in the mesh.
         """
 
-        return 0.0 # placeholder value
+        nVerts = len(mesh.verts)
+        nEdges = len(mesh.edges)
+        nFaces = len(mesh.faces)
+        return 2 * pi * (nVerts - nEdges + nFaces) # placeholder value
 
 
     ###################### END YOUR CODE
