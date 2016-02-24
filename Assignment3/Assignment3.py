@@ -61,7 +61,22 @@ def main():
         Vertex.normal will mean area-weighted normals, unless otherwise specified)
         """
 
-        return 0.0 # placeholder value
+        halfEdge0 = self.anyHalfEdge
+        halfEdge1 = halfEdge0.twin
+
+        a = norm(halfEdge0.vector)
+        b = norm(halfEdge0.next.vector)
+        c = norm(halfEdge0.next.next.vector)
+        area = halfEdge0.face.area
+        cotAlpha = (b * b + c * c - a * a) / 4 / area
+
+        a = norm(halfEdge1.vector)
+        b = norm(halfEdge1.next.vector)
+        c = norm(halfEdge1.next.next.vector)
+        area = halfEdge1.face.area
+        cotBeta = (b * b + c * c - a * a) / 4 / area
+
+        return (cotAlpha + cotBeta) / 2.0 # placeholder value
 
 
     @property
@@ -75,7 +90,11 @@ def main():
         faces.
         """
 
-        return 0.0 # placeholder value
+        areaSum = 0.0
+        for halfEdge in self.adjacentHalfEdges():
+            face = halfEdge.face
+            areaSum += face.area
+        return areaSum / 3.0 # placeholder value
 
 
     def enumerateVertices(mesh):
@@ -86,7 +105,12 @@ def main():
         You will want to use this function in your solutions below.
         """
 
-        return None # placeholder value
+        index = dict();
+        i = 0;
+        for vert in mesh.verts:
+            index.update({vert:i})
+            i += 1
+        return index # placeholder value
 
 
     #################################
@@ -109,7 +133,17 @@ def main():
         Returns the resulting matrix.
         """
 
-        return None # placeholder value
+        N = len(index)
+        laplaceMatrix_dense = np.zeros((N, N))
+        for vert in mesh.verts:
+            for adjacentHalfEdge in vert.adjacentHalfEdges():
+                vi = vert
+                vj = adjacentHalfEdge.vertex
+                edge = adjacentHalfEdge.edge
+                laplaceMatrix_dense[index[vi], index[vi]] -= edge.cotanWeight;
+                laplaceMatrix_dense[index[vi], index[vj]] = edge.cotanWeight;
+
+        return laplaceMatrix_dense # placeholder value
 
 
     def buildMassMatrix_dense(mesh, index):
@@ -119,7 +153,11 @@ def main():
         Returns the resulting matrix.
         """
 
-        return None # placeholder value
+        N = len(index)
+        massMatrix_dense = np.zeros((N, N))
+        for vert in mesh.verts:
+            massMatrix_dense[index[vert], index[vert]] = vert.dualArea
+        return massMatrix_dense # placeholder value
 
 
     def solvePoissonProblem_dense(mesh, densityValues):
@@ -136,8 +174,25 @@ def main():
         you will get to click on vertices to specify density conditions. See the
         assignment document for more details.
         """
-
-        pass # remove this line once you have implemented the method
+        
+        index = enumerateVertices(mesh)
+        massMatrix_dense = buildMassMatrix_dense(mesh, index)
+        laplaceMatrix_dense = buildLaplaceMatrix_dense(mesh, index)
+        
+        N = len(index)
+        b = np.zeros((N,1))
+        for vert in densityValues.keys():
+             b[index[vert],0] = densityValues[vert]
+        rhoBar = massMatrix_dense * b
+        b -= rhoBar.sum() / massMatrix_dense.sum()
+        laplaceMatrix_dense = np.delete(laplaceMatrix_dense,N-1,axis = 0)
+        laplaceMatrix_dense = np.delete(laplaceMatrix_dense,N-1,axis = 1)
+        b = np.delete(b,N-1,axis = 0)
+        x = np.linalg.solve(laplaceMatrix_dense, b)
+        x = np.append(x,0.0)
+        value = {vert:x[index[vert]] for vert in index.keys()}
+        for vert in mesh.verts:
+            mesh.applyVertexValue(value, 'solutionVal')
 
 
     ##################################
@@ -162,7 +217,19 @@ def main():
         Returns the resulting sparse matrix.
         """
 
-        return None # placeholder value
+        N = len(index)
+        laplaceMatrix_sparse = np.zeros((N, N))
+        for vert in mesh.verts:
+            for adjacentHalfEdge in vert.adjacentHalfEdges():
+                vi = vert
+                vj = adjacentHalfEdge.vertex
+                edge = adjacentHalfEdge.edge
+                laplaceMatrix_sparse[index[vi], index[vi]] -= edge.cotanWeight;
+                laplaceMatrix_sparse[index[vi], index[vj]] = edge.cotanWeight;
+        laplaceMatrix_sparse = np.delete(laplaceMatrix_sparse,N-1,axis = 0)
+        laplaceMatrix_sparse = np.delete(laplaceMatrix_sparse,N-1,axis = 1)      
+        
+        return scipy.sparse.csr_matrix(laplaceMatrix_sparse) # placeholder value
 
     def buildMassMatrix_sparse(mesh, index):
         """
@@ -171,7 +238,11 @@ def main():
         Returns the resulting sparse matrix.
         """
 
-        return None # placeholder value
+        N = len(index)
+        massMatrix_sparse = scipy.sparse.lil_matrix((N, N))
+        for vert in mesh.verts:
+            massMatrix_sparse[index[vert], index[vert]] = vert.dualArea
+        return massMatrix_sparse.tocsr() # placeholder value
 
 
     def solvePoissonProblem_sparse(mesh, densityValues):
@@ -191,8 +262,23 @@ def main():
         assignment document for more details.
         """
 
+        index = enumerateVertices(mesh)
+        massMatrix_sparse = buildMassMatrix_sparse(mesh, index)
+        laplaceMatrix_sparse = buildLaplaceMatrix_sparse(mesh, index)
+        
+        N = len(index)
+        b = np.zeros((N,1))
+        for vert in densityValues.keys():
+             b[index[vert],0] = densityValues[vert]
+        rhoBar = massMatrix_sparse * b
+        b -= rhoBar.sum() / massMatrix_sparse.sum()
+        b = np.delete(b,N-1,axis = 0)
 
-        pass # remove this line once you have implemented the method
+        x = scipy.sparse.linalg.spsolve(laplaceMatrix_sparse, b)
+        x = np.append(x,0.0)
+        value = {vert:x[index[vert]] for vert in index.keys()}
+        for vert in mesh.verts:
+            mesh.applyVertexValue(value, 'solutionVal')
 
 
     ###############################
@@ -215,8 +301,21 @@ def main():
 
         Returns the resulting matrix.
         """
-
-        return None # placeholder value
+        N = len(index)
+        laplaceMatrix_sparse = scipy.sparse.lil_matrix((N, N))
+        massMatrix_sparse = scipy.sparse.lil_matrix((N, N))
+        for vert in mesh.verts:
+            massMatrix_sparse[index[vert], index[vert]] = vert.dualArea
+            for adjacentHalfEdge in vert.adjacentHalfEdges():
+                vi = vert
+                vj = adjacentHalfEdge.vertex
+                edge = adjacentHalfEdge.edge
+                laplaceMatrix_sparse[index[vi], index[vi]] -= edge.cotanWeight;
+                laplaceMatrix_sparse[index[vi], index[vj]] = edge.cotanWeight;
+        massMatrix_sparse = massMatrix_sparse
+        I = scipy.sparse.eye(N)
+        meanCurvatureFlowOperator = I - h *  scipy.sparse.linalg.spsolve(massMatrix_sparse.tocsc(),laplaceMatrix_sparse.tocsc())
+        return meanCurvatureFlowOperator.tocsc() # placeholder value
 
     def meanCurvatureFlow(mesh, h):
         """
@@ -238,7 +337,22 @@ def main():
         you assemble your operator, or it will be very slow.
         """
 
-        pass # remove this line once you have implemented the method
+        index = enumerateVertices(mesh)
+        N = len(index)
+        meanCurvatureFlowOperator = buildMeanCurvatureFlowOperator(mesh, index, h)
+        f0 = scipy.sparse.lil_matrix((N, 3))
+        for vert in mesh.verts:
+            vf0 = vert.position
+            f0[index[vert],0] = vf0[0]
+            f0[index[vert],1] = vf0[1]
+            f0[index[vert],2] = vf0[2]
+        f0 = f0.tocsr()
+        fh = scipy.sparse.linalg.spsolve(meanCurvatureFlowOperator, f0)
+
+        mesh.staticGeometry = False
+        for vert in mesh.verts:
+            vert.position = Vector3D(fh[index[vert],0], fh[index[vert],1], fh[index[vert],2])
+        mesh.staticGeometry = True
 
 
 
